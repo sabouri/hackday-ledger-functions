@@ -91,7 +91,7 @@ func Withdraw(w http.ResponseWriter, req *http.Request) {
 	balanceAgain, er1 := doTransaction(username, i1)
 
 	if er1 != nil {
-		fmt.Fprint(w, errors.New("Insufficient Funds"))
+		fmt.Fprint(w, errors.New("Insufficient Funds!!"))
 	}
 
 	fmt.Fprint(w, balanceAgain)

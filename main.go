@@ -33,6 +33,16 @@ func init() {
 	db.SetMaxOpenConns(1)
 }
 
+func Balance(w http.ResponseWriter, req *http.Request) {
+	query := req.URL.Query()
+
+	username := query.Get("username")
+
+	account := findAccount(username)
+
+	fmt.Fprint(w, account.Balance)
+}
+
 // Account domain object ledger
 type Account struct {
 	QualifiedUsername string
@@ -91,20 +101,10 @@ func Withdraw(w http.ResponseWriter, req *http.Request) {
 	balanceAgain, er1 := doTransaction(username, i1)
 
 	if er1 != nil {
-		fmt.Fprint(w, errors.New("Insufficient Funds!!"))
+		fmt.Fprint(w, errors.New("Insufficient Funds"))
 	}
 
 	fmt.Fprint(w, balanceAgain)
-}
-
-func Balance(w http.ResponseWriter, req *http.Request) {
-	query := req.URL.Query()
-
-	username := query.Get("username")
-
-	account := findAccount(username)
-
-	fmt.Fprint(w, account.Balance)
 }
 
 func tryCreatingAccount(qualifiedUsername string) {

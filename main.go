@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -62,17 +61,19 @@ func Deposit(w http.ResponseWriter, req *http.Request) {
 	}
 
 	balance, er := doTransaction(username, i1)
-
-	if er == nil {
+	if er != nil {
+		switch err.(type) {
+		case *ErrUserNotFound:
+			tryCreatingAccount(username)
+			balanceAgain, _ := doTransaction(username, i1)
+			fmt.Fprint(w, balanceAgain)
+			return
+		default:
+			fmt.Fprint(w, "Oops! Something techy happened!!")
+		}
+	} else {
 		fmt.Fprint(w, balance)
-		return
 	}
-
-	tryCreatingAccount(username)
-
-	balance, er = doTransaction(username, i1)
-
-	fmt.Fprint(w, balance)
 }
 
 func Withdraw(w http.ResponseWriter, req *http.Request) {
@@ -81,50 +82,56 @@ func Withdraw(w http.ResponseWriter, req *http.Request) {
 	username := query.Get("username")
 	amount := query.Get("amount")
 
-	/** converting the str1 variable into an int using Atoi method */
 	i1, err := strconv.Atoi(amount)
 	if err != nil {
 		panic(err)
 	}
 
+	//negate the amount received in the request
 	i1 = i1 * -1
 
-	balance, er := doTransaction(username, i1)
+	balance, err := doTransaction(username, i1)
 
-	if er == nil {
+	if err != nil {
+		switch err.(type) {
+		case *ErrUserNotFound:
+			tryCreatingAccount(username)
+			balanceAgain, _ := doTransaction(username, i1)
+			fmt.Fprint(w, balanceAgain)
+			return
+		case *ErrInsufficientFunds:
+			fmt.Fprint(w, "Insufficient Funds")
+			return
+		default:
+			fmt.Fprint(w, "Oops! Something techy happened!!")
+		}
+	} else {
 		fmt.Fprint(w, balance)
-		return
 	}
-
-	tryCreatingAccount(username)
-
-	balanceAgain, er1 := doTransaction(username, i1)
-
-	if er1 != nil {
-		fmt.Fprint(w, errors.New("Insufficient Funds"))
-	}
-
-	fmt.Fprint(w, balanceAgain)
 }
 
 func tryCreatingAccount(qualifiedUsername string) {
 	sqlStatement := `
 	INSERT INTO account (qualified_username, balance)
 	VALUES ($1, $2)`
-	_, err := db.Exec(sqlStatement, qualifiedUsername, 100000)
+	_, err := db.Exec(sqlStatement, qualifiedUsername, 1000)
 	if err != nil {
 		panic(err)
 	}
 }
 
 func doTransaction(qualifiedUsername string, amount int) (float64, error) {
-	account := findAccount(qualifiedUsername)
-	modifiedBalance := account.Balance + float64(amount)
+	acc := findAccount(qualifiedUsername)
+
+	if acc == nil {
+		return 0, NewErrUserNotFound("User not found")
+	}
+
 	sqlStatement := `
 		UPDATE account
-		SET balance = $1 
-		WHERE qualified_username = $2 AND balance > $3;`
-	res, err := db.Exec(sqlStatement, modifiedBalance, qualifiedUsername, modifiedBalance)
+		SET balance = balance + $1 
+		WHERE qualified_username = $2 AND balance + $3 >= 0;`
+	res, err := db.Exec(sqlStatement, amount, qualifiedUsername, amount)
 	if err != nil {
 		panic(err)
 	}
@@ -134,11 +141,11 @@ func doTransaction(qualifiedUsername string, amount int) (float64, error) {
 		panic(err)
 	}
 
-	if int(count) == 0 {
-		return 0, errors.New("this is an error")
+	if count == 0 {
+		return 0, NewErrInsufficientFunds("Insufficient funds")
 	}
 
-	acc := findAccount(qualifiedUsername)
+	acc = findAccount(qualifiedUsername)
 
 	return acc.Balance, nil
 }
@@ -156,4 +163,34 @@ func findAccount(qualifiedUsername string) *Account {
 	default:
 		panic(err)
 	}
+}
+
+//ErrUserNotFound model for user not found
+type ErrUserNotFound struct {
+	message string
+}
+
+//NewErrUserNotFound function for User not found
+func NewErrUserNotFound(message string) *ErrUserNotFound {
+	return &ErrUserNotFound{
+		message: message,
+	}
+}
+func (e *ErrUserNotFound) Error() string {
+	return e.message
+}
+
+//ErrInsufficientFunds model for insufficient funds
+type ErrInsufficientFunds struct {
+	message string
+}
+
+//NewErrInsufficientFunds function for insufficient funds
+func NewErrInsufficientFunds(message string) *ErrInsufficientFunds {
+	return &ErrInsufficientFunds{
+		message: message,
+	}
+}
+func (e *ErrInsufficientFunds) Error() string {
+	return e.message
 }

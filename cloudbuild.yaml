@@ -1,4 +1,4 @@
 steps:
     # Deploy to Cloud Functions
   - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['functions', 'deploy', 'balance', '--source', 'https://source.developers.google.com/projects/hackday-ledger/repos/github_sabouri_hackday-ledger-functions/moveable-aliases/master/paths/']
+    args: ['functions', 'deploy', 'balance', '--source', 'https://source.developers.google.com/projects/hackday-ledger/repos/github_sabouri_hackday-ledger-functions/moveable-aliases/master/paths/', '--trigger-http']
